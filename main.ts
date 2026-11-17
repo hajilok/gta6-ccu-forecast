@@ -132,14 +132,10 @@ for (const file of inputs) {
     }
   }
 
-  // Canonical row order first, so the cumulative floor below always runs
-  // from the earlier hour to the later one.
+  // Canonical row order.
   hours.sort((a, b) => a.hour - b.hour);
 
-  // Clamp into (0, 1e9], then force non-decreasing values: first within each
-  // row (rounded), then a cumulative floor of each row on the next row's row
-  // (each next-row value at least the previous row's value at the same index).
-  // NOTE: a median may not equal p1 * exp(mu) exactly where the floor binds.
+  // Clamp into (0, 1e9], then force non-decreasing values within each row.
   for (const row of hours) {
     for (let i = 0; i < row.q.length; i++) {
       let v = row.q[i];
@@ -149,11 +145,6 @@ for (const file of inputs) {
     }
     for (let i = 1; i < row.q.length; i++) {
       if (row.q[i] < row.q[i - 1]) row.q[i] = row.q[i - 1];
-    }
-  }
-  for (let r = 1; r < hours.length; r++) {
-    for (let i = 0; i < hours[r].q.length; i++) {
-      if (hours[r].q[i] < hours[r - 1].q[i]) hours[r].q[i] = hours[r - 1].q[i];
     }
   }
 
