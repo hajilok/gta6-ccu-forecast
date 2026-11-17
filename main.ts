@@ -1,7 +1,7 @@
 // gta6-twitch-ccu-forecast-01: comparable-launch curve forecast (Node 22, stdlib only).
 // Reads every <id>.in case, keeps comparables that were already live at their
 // launch hour and rise into the US day, averages their log viewer ratios to
-// launch hour with recency weights, and issues lognormal quantiles around the
+// launch hour, and issues lognormal quantiles around the
 // case's hour-1 print; falls back to random-walk persistence with no usable
 // comparable. Run: MAKEFUN_INPUT_DIR=input MAKEFUN_OUTPUT_DIR=out node main.ts
 
@@ -53,7 +53,7 @@ for (const file of inputs) {
     if (v0 === undefined || v0 <= 0) continue;
     let peak = 0;
     for (const v of byOff.values()) if (v > peak) peak = v;
-    if (peak <= 0 || v0 / peak < 0.05) continue;
+    if (peak <= 0 || v0 / peak < 0.15) continue;
     const v5 = byOff.get(5);
     const v19 = byOff.get(19);
     if (v5 === undefined || v19 === undefined || v5 <= 0 || v19 <= 0) continue;
@@ -64,8 +64,7 @@ for (const file of inputs) {
       if (v !== undefined && v > 0) ratios.set(h, Math.log(v / v0));
     }
     if (ratios.size === 0) continue;
-    const year = new Date(comp.day_start).getUTCFullYear();
-    const w = Math.pow(0.9, Math.max(0, 2026 - year));
+    const w = 1.0;
     series.push({ w, ratios });
   }
 
@@ -127,8 +126,8 @@ for (const file of inputs) {
     };
     for (const { hour } of c.forecast) {
       const m = muAt(hour);
-      // Floor every sd at 0.25, then widen the band by 1.1.
-      const s = Math.max(0.25, sdAt(hour)) * 1.1;
+      // Floor every sd at 0.25, then scale the band by 0.9.
+      const s = Math.max(0.25, sdAt(hour)) * 0.9;
       const q = Z.map((z) => p1 * Math.exp(m + z * s));
       hours.push({ hour, q: q.map(round2) });
     }
