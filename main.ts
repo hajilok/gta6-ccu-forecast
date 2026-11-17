@@ -1,3 +1,10 @@
+// gta6-twitch-ccu-forecast-01: comparable-launch curve forecast (Node 22, stdlib only).
+// Reads every <id>.in case, keeps comparables that were already live at their
+// launch hour and rise into the US day, averages their log viewer ratios to
+// launch hour with recency weights, and issues lognormal quantiles around the
+// case's hour-1 print; falls back to random-walk persistence with no usable
+// comparable. Run: MAKEFUN_INPUT_DIR=input MAKEFUN_OUTPUT_DIR=out node main.ts
+
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -8,16 +15,11 @@ const LEVELS = [0.05, 0.25, 0.5, 0.75, 0.95];
 const Z = [-1.6448536269514722, -0.6744897501960817, 0, 0.6744897501960817, 1.6448536269514722];
 const SIGMA = 0.15;
 
-interface Known { hour: number; viewers: number; }
-interface ForecastRow { hour: number; }
-interface HourlyPoint { from: string; viewers: number | null; }
-interface Comparable { name: string; day_start: string; hourly: HourlyPoint[]; }
-interface Case {
-  levels: number[];
-  known: Known[];
-  forecast: ForecastRow[];
-  comparables: Comparable[];
-}
+type Known = { hour: number; viewers: number };
+type ForecastRow = { hour: number };
+type HourlyPoint = { from: string; viewers: number | null };
+type Comparable = { name: string; day_start: string; hourly: HourlyPoint[] };
+type Case = { levels: number[]; known: Known[]; forecast: ForecastRow[]; comparables: Comparable[] };
 
 const round2 = (x: number): number => Math.round(x * 100) / 100;
 
@@ -135,7 +137,9 @@ for (const file of inputs) {
   // Canonical row order.
   hours.sort((a, b) => a.hour - b.hour);
 
-  // Clamp into (0, 1e9], then force non-decreasing values within each row.
+  // Clamp into (0, 1e9], force non-decreasing values within each row
+  // (rounded), then a cumulative floor: each row's values at least the
+  // previous row's (a cumulative floor is fine).
   for (const row of hours) {
     for (let i = 0; i < row.q.length; i++) {
       let v = row.q[i];
@@ -145,6 +149,11 @@ for (const file of inputs) {
     }
     for (let i = 1; i < row.q.length; i++) {
       if (row.q[i] < row.q[i - 1]) row.q[i] = row.q[i - 1];
+    }
+  }
+  for (let r = 1; r < hours.length; r++) {
+    for (let i = 0; i < hours[r].q.length; i++) {
+      if (hours[r].q[i] < hours[r - 1].q[i]) hours[r].q[i] = hours[r - 1].q[i];
     }
   }
 
