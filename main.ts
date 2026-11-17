@@ -52,8 +52,17 @@ for (const file of inputs) {
     const v0 = byOff.get(0);
     if (v0 === undefined || v0 <= 0) continue;
     let peak = 0;
-    for (const v of byOff.values()) if (v > peak) peak = v;
+    let peakOff = 0;
+    for (const [off, v] of byOff) {
+      if (v > peak) {
+        peak = v;
+        peakOff = off;
+      }
+    }
     if (peak <= 0 || v0 / peak < 0.15) continue;
+    // A day that ramps peaks after the early hours. A launch that peaks in hour 1 or 2 held a
+    // single global unlock and then only declines; its shape is not this launch's.
+    if (peakOff < 6) continue;
     const v5 = byOff.get(5);
     const v19 = byOff.get(19);
     if (v5 === undefined || v19 === undefined || v5 <= 0 || v19 <= 0) continue;
@@ -126,8 +135,8 @@ for (const file of inputs) {
     };
     for (const { hour } of c.forecast) {
       const m = muAt(hour);
-      // Floor every sd at 0.25, then scale the band by 0.9.
-      const s = Math.max(0.25, sdAt(hour)) * 0.9;
+      // Floor every sd at 0.25, then scale the band by 1.0.
+      const s = Math.max(0.25, sdAt(hour)) * 1.0;
       const q = Z.map((z) => p1 * Math.exp(m + z * s));
       hours.push({ hour, q: q.map(round2) });
     }
@@ -136,9 +145,9 @@ for (const file of inputs) {
   // Canonical row order.
   hours.sort((a, b) => a.hour - b.hour);
 
-  // Clamp into (0, 1e9], force non-decreasing values within each row
-  // (rounded), then a cumulative floor: each row's values at least the
-  // previous row's (a cumulative floor is fine).
+  // Clamp into (0, 1e9] and force non-decreasing values within each row
+  // (rounded). Hours are free to fall from one row to the next: the launch
+  // day troughs after hour 1 and decays late, and the median must follow it.
   for (const row of hours) {
     for (let i = 0; i < row.q.length; i++) {
       let v = row.q[i];
@@ -148,11 +157,6 @@ for (const file of inputs) {
     }
     for (let i = 1; i < row.q.length; i++) {
       if (row.q[i] < row.q[i - 1]) row.q[i] = row.q[i - 1];
-    }
-  }
-  for (let r = 1; r < hours.length; r++) {
-    for (let i = 0; i < hours[r].q.length; i++) {
-      if (hours[r].q[i] < hours[r - 1].q[i]) hours[r].q[i] = hours[r - 1].q[i];
     }
   }
 
